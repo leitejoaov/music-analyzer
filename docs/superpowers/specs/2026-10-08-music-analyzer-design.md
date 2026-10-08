@@ -22,6 +22,7 @@ analyzer/
   app.py              # Flask: POST /analyze, GET /health
   audio.py            # download (yt-dlp) + features (Essentia) + moods (8 modelos MusiCNN)
   lyrics.py           # LRCLIB → lyrics.ovh, limpeza de nomes, checagem de artista
+  meta.py             # índice das classes dos modelos e categorias de erro (sem dependência pesada)
   download_models.py  # baixa os modelos na build
 batch/
   history.py          # leitura do export do Spotify → ranking de faixas (funções puras)
@@ -62,7 +63,7 @@ Saída, sempre 200 quando a entrada é válida:
 ```
 
 - Áudio e letra são buscados em paralelo (duas threads) e são independentes.
-- Se o áudio falha, `audio` é `null` e `audio_error` é um de: `age_restricted`, `forbidden`, `not_found`, `network`, `analysis_failed`. A letra ainda vem.
+- Se o áudio falha, `audio` é `null` e `audio_error` é um de: `age_restricted`, `forbidden`, `not_found`, `network`, `download_failed` (outro erro do yt-dlp), `analysis_failed` (baixou, mas a análise falhou). A letra ainda vem.
 - Se a letra não é encontrada, `lyrics` é `{"found": false, "source": null, "text": null}`.
 - `lyrics.text` é cortado em `LYRICS_MAX_CHARS` (padrão 3000).
 
@@ -74,7 +75,7 @@ Saída, sempre 200 quando a entrada é válida:
 
 Mesmo comportamento do `audio-service/app.py` do Spotaste na `main` atual:
 
-- Busca `"{track} {artist} official audio"` no YouTube (`ytsearch1`, duração < 600 s), extrai mp3, apaga o arquivo no fim.
+- Busca `"{track} {artist} official audio"` no YouTube (prefixo `ytsearch1:` explícito, para títulos como "re: stacks" não serem lidos como URL; duração < 600 s), extrai mp3, apaga o arquivo no fim.
 - Essentia: BPM, tom/modo, loudness, energy, danceability.
 - 8 heads MusiCNN, lendo a classe certa de cada um (`MOOD_HEADS`: happy 0, sad 1, aggressive 0, relaxed 1, party 1, voice_instrumental 0, acoustic 0, danceability 0). A danceability do modelo substitui a algorítmica.
 - Erros do yt-dlp são classificados nas categorias de `audio_error` pela mensagem.
@@ -86,7 +87,7 @@ Porta para Python do `packages/backend/src/lyrics.ts` do Spotaste:
 - `clean_for_search(artist, title)`: remove ruído de título (Official Video, Remaster, feat., Ao Vivo, parênteses/colchetes) e sufixos de canal no artista.
 - `fetch_lyrics(artist, title)`: tenta LRCLIB (`/api/search`, com User-Agent) e depois lyrics.ovh; para cada fonte, primeiro com nomes limpos e depois com o artista original se for diferente.
 - LRCLIB: só aceita resultado cujo `artistName` normalizado (sem acento, sem pontuação, minúsculo) contém ou está contido no artista pedido, e com `plainLyrics` com mais de 20 caracteres.
-- Timeout de 8 s por requisição; qualquer erro de rede conta como "não encontrada".
+- Timeout de 8 s por requisição. Respostas 429/502/503/504 (o LRCLIB responde 503 quando está ocupado) e erros de rede são tentados de novo, até três tentativas por busca; depois disso conta como "não encontrada".
 
 ### Execução
 
@@ -122,6 +123,7 @@ python -m batch.import_history export [--db results.db] [--out results.json]
 - Concorrência padrão 1.
 - Antes de começar, checa o `/health`; se o serviço não responde, sai com mensagem clara.
 - Falha de conexão com o serviço ou `audio_error: network` não marca a música como `failed`: o script espera (30 s, dobrando até 5 min) e tenta a mesma música de novo. Isso evita queimar centenas de músicas quando a internet cai.
+- Timeout de leitura (330 s) marca a música como `failed` com `audio_error: timeout`; resposta diferente de 200 marca `service_error`. Essas duas categorias só existem no lote.
 - Progresso a cada 10 músicas, com ETA por tempo de relógio.
 - `export` grava um JSON com uma lista de objetos no mesmo formato da resposta do `/analyze`, mais `spotify_id` e `plays`.
 

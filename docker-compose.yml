@@ -1,0 +1,10 @@
+services:
+  analyzer:
+    build: .
+    # essentia-tensorflow only ships linux x86_64 wheels; on Apple Silicon this runs emulated
+    platform: linux/amd64
+    ports:
+      - "127.0.0.1:${ANALYZER_PORT:-5001}:5001"
+    environment:
+      - WEB_CONCURRENCY=${WEB_CONCURRENCY:-3}
+      - LYRICS_MAX_CHARS=${LYRICS_MAX_CHARS:-3000}

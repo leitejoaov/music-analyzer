@@ -1,0 +1,5 @@
+essentia-tensorflow==2.1b6.dev1389
+flask
+gunicorn>=21.2
+requests
+yt-dlp

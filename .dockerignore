@@ -1,0 +1,7 @@
+.git
+docs
+tests
+batch
+results.db
+results.json
+*.zip
