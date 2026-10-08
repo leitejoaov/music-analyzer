@@ -150,4 +150,4 @@ Em português, escrito para alguém (ou um modelo) adaptar o código: o que o se
 
 ## Repositório
 
-`github.com/leitejoaov/music-analyzer`, privado, conta pessoal (fora da org `brendi-tech`). Código e comentários em inglês.
+`github.com/leitejoaov/music-analyzer`, público, conta pessoal. Código e comentários em inglês.
